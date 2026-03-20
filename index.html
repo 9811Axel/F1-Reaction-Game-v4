@@ -1,0 +1,1067 @@
+<!doctype html>
+<html lang="en" class="h-full">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>F1 Reaction Challenge</title>
+
+    <script src="https://cdn.tailwindcss.com/3.4.17"></script>
+    <script src="https://cdn.jsdelivr.net/npm/lucide@0.263.0/dist/umd/lucide.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;600;700;800;900&family=Barlow:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
+    <style>
+      html, body { height: 100%; margin: 0; }
+      * { box-sizing: border-box; }
+
+      .light-off { background: #2a0a0a; box-shadow: inset 0 2px 8px rgba(0,0,0,0.6); }
+      .light-on { background: #ff1a1a; box-shadow: 0 0 30px #ff1a1a, 0 0 60px rgba(255,26,26,0.5), inset 0 -4px 8px rgba(200,0,0,0.4); }
+      .light-green { background: #00ff66; box-shadow: 0 0 30px #00ff66, 0 0 60px rgba(0,255,102,0.5), inset 0 -4px 8px rgba(0,200,60,0.4); }
+
+      @keyframes lightPulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.85; } }
+      .light-on { animation: lightPulse 0.8s ease-in-out infinite; }
+
+      @keyframes slideUp { from { opacity: 0; transform: translateY(30px); } to { opacity: 1; transform: translateY(0); } }
+      .anim-slide-up { animation: slideUp 0.5s ease-out forwards; }
+
+      @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+      .anim-fade { animation: fadeIn 0.4s ease-out forwards; }
+
+      @keyframes countPop {
+        0% { transform: scale(0.5); opacity: 0; }
+        50% { transform: scale(1.15); }
+        100% { transform: scale(1); opacity: 1; }
+      }
+      .anim-pop { animation: countPop 0.3s ease-out forwards; }
+
+      @keyframes shakeX {
+        0%, 100% { transform: translateX(0); }
+        20% { transform: translateX(-8px); }
+        40% { transform: translateX(8px); }
+        60% { transform: translateX(-5px); }
+        80% { transform: translateX(5px); }
+      }
+      .anim-shake { animation: shakeX 0.4s ease-out; }
+
+      @keyframes glowPulse {
+        0%, 100% { box-shadow: 0 0 20px rgba(0,255,102,0.3); }
+        50% { box-shadow: 0 0 40px rgba(0,255,102,0.6); }
+      }
+
+      .scrollbar-thin::-webkit-scrollbar { width: 6px; }
+      .scrollbar-thin::-webkit-scrollbar-track { background: rgba(255,255,255,0.05); }
+      .scrollbar-thin::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.2); border-radius: 3px; }
+
+      .carbon-pattern {
+        background-image:
+          linear-gradient(45deg, rgba(255,255,255,0.02) 25%, transparent 25%),
+          linear-gradient(-45deg, rgba(255,255,255,0.02) 25%, transparent 25%),
+          linear-gradient(45deg, transparent 75%, rgba(255,255,255,0.02) 75%),
+          linear-gradient(-45deg, transparent 75%, rgba(255,255,255,0.02) 75%);
+        background-size: 4px 4px;
+        background-position: 0 0, 0 2px, 2px -2px, -2px 0;
+      }
+
+      .btn-race {
+        transition: all 0.15s ease;
+        position: relative;
+        overflow: hidden;
+      }
+      .btn-race::after {
+        content: '';
+        position: absolute;
+        top: 0; left: -100%; width: 100%; height: 100%;
+        background: linear-gradient(90deg, transparent, rgba(255,255,255,0.1), transparent);
+        transition: left 0.4s ease;
+      }
+      .btn-race:hover::after { left: 100%; }
+
+      .rank-gold { color: #ffd700; }
+      .rank-silver { color: #c0c0c0; }
+      .rank-bronze { color: #cd7f32; }
+
+      .toast-container {
+        position: fixed; top: 20px; right: 20px; z-index: 9999;
+        display: flex; flex-direction: column; gap: 8px;
+      }
+      .toast {
+        padding: 12px 20px; border-radius: 8px; color: white;
+        font-family: 'Barlow', sans-serif; font-size: 14px;
+        animation: slideUp 0.3s ease-out;
+        max-width: 320px;
+      }
+      .toast-error { background: #dc2626; }
+      .toast-success { background: #16a34a; }
+      .toast-warning { background: #d97706; }
+
+      .tab-active { border-bottom: 3px solid #ff1a1a; color: #ff1a1a; }
+    </style>
+  </head>
+
+  <body class="h-full">
+    <div id="app" class="h-full w-full overflow-auto" style="background: #0a0a0f; font-family: 'Barlow', sans-serif;">
+      <div class="toast-container" id="toastContainer"></div>
+
+      <!-- NAV -->
+      <nav id="mainNav" class="hidden w-full" style="background: rgba(10,10,15,0.95); border-bottom: 1px solid rgba(255,255,255,0.08); backdrop-filter: blur(10px); position: sticky; top: 0; z-index: 100;">
+        <div class="max-w-6xl mx-auto px-4 py-3 flex items-center justify-between">
+          <div class="flex items-center gap-3 cursor-pointer" onclick="showPage('dashboard')">
+            <div class="flex gap-1">
+              <div class="w-3 h-3 rounded-full" style="background: #ff1a1a;"></div>
+              <div class="w-3 h-3 rounded-full" style="background: #ff1a1a;"></div>
+              <div class="w-3 h-3 rounded-full" style="background: #ff1a1a;"></div>
+            </div>
+            <span id="navTitle" class="text-white font-bold text-lg" style="font-family: 'Orbitron', monospace;">F1 REACTION</span>
+          </div>
+          <div class="flex items-center gap-4">
+            <button onclick="showPage('dashboard')" class="text-gray-400 hover:text-white transition-colors text-sm font-medium px-3 py-1">Dashboard</button>
+            <button onclick="showPage('game')" class="text-gray-400 hover:text-white transition-colors text-sm font-medium px-3 py-1">Play</button>
+            <button onclick="showPage('leaderboard')" class="text-gray-400 hover:text-white transition-colors text-sm font-medium px-3 py-1">Leaderboard</button>
+            <div class="flex items-center gap-2 ml-2 pl-4" style="border-left: 1px solid rgba(255,255,255,0.1);">
+              <div id="navAvatar" class="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold text-white" style="background: linear-gradient(135deg, #ff1a1a, #cc0000);"></div>
+              <span id="navUsername" class="text-gray-300 text-sm font-medium hidden sm:inline"></span>
+              <button onclick="logout()" class="text-gray-500 hover:text-red-400 transition-colors ml-1" title="Log out">
+                <i data-lucide="log-out" style="width:16px;height:16px;"></i>
+              </button>
+            </div>
+          </div>
+        </div>
+      </nav>
+
+      <!-- LOGIN PAGE -->
+      <div id="loginPage" class="h-full flex items-center justify-center px-4 carbon-pattern">
+        <div class="w-full max-w-md anim-slide-up">
+          <div class="text-center mb-8">
+            <div class="flex justify-center gap-2 mb-4">
+              <div class="w-5 h-5 rounded-full" style="background:#ff1a1a; box-shadow:0 0 15px rgba(255,26,26,0.5);"></div>
+              <div class="w-5 h-5 rounded-full" style="background:#ff1a1a; box-shadow:0 0 15px rgba(255,26,26,0.5);"></div>
+              <div class="w-5 h-5 rounded-full" style="background:#ff1a1a; box-shadow:0 0 15px rgba(255,26,26,0.5);"></div>
+              <div class="w-5 h-5 rounded-full" style="background:#ff1a1a; box-shadow:0 0 15px rgba(255,26,26,0.5);"></div>
+              <div class="w-5 h-5 rounded-full" style="background:#ff1a1a; box-shadow:0 0 15px rgba(255,26,26,0.5);"></div>
+            </div>
+            <h1 id="loginTitle" class="text-3xl font-black text-white mb-2" style="font-family:'Orbitron',monospace;">F1 REACTION</h1>
+            <p id="loginSubtitle" class="text-gray-400 text-sm">Test your reflexes like an F1 driver</p>
+          </div>
+
+          <div id="authCard" class="rounded-2xl p-6 sm:p-8" style="background: linear-gradient(145deg, rgba(30,30,40,0.9), rgba(20,20,28,0.95)); border: 1px solid rgba(255,255,255,0.08);">
+            <div class="flex mb-6" style="border-bottom: 1px solid rgba(255,255,255,0.1);">
+              <button id="tabLogin" onclick="switchAuthTab('login')" class="flex-1 pb-3 text-sm font-semibold tab-active">LOG IN</button>
+              <button id="tabSignup" onclick="switchAuthTab('signup')" class="flex-1 pb-3 text-sm font-semibold text-gray-500">SIGN UP</button>
+            </div>
+
+            <form id="loginForm" onsubmit="handleLogin(event)" class="space-y-4">
+              <div>
+                <label for="loginUser" class="text-gray-400 text-xs font-medium uppercase tracking-wider mb-1 block">Email</label>
+                <input id="loginUser" type="email" required class="w-full px-4 py-3 rounded-lg text-white text-sm outline-none transition-all focus:ring-2 focus:ring-red-500" style="background:rgba(255,255,255,0.06); border:1px solid rgba(255,255,255,0.1);" placeholder="Enter your email">
+              </div>
+              <div>
+                <label for="loginPass" class="text-gray-400 text-xs font-medium uppercase tracking-wider mb-1 block">Password</label>
+                <input id="loginPass" type="password" required class="w-full px-4 py-3 rounded-lg text-white text-sm outline-none transition-all focus:ring-2 focus:ring-red-500" style="background:rgba(255,255,255,0.06); border:1px solid rgba(255,255,255,0.1);" placeholder="Enter password">
+              </div>
+              <div id="loginError" class="text-red-400 text-xs hidden"></div>
+              <button type="submit" id="loginBtn" class="btn-race w-full py-3 rounded-lg text-white font-bold text-sm uppercase tracking-wider" style="background: linear-gradient(135deg, #e60000, #b30000);"> Start Engine </button>
+            </form>
+
+            <form id="signupForm" onsubmit="handleSignup(event)" class="space-y-4 hidden">
+              <div>
+                <label for="signupUser" class="text-gray-400 text-xs font-medium uppercase tracking-wider mb-1 block">Email</label>
+                <input id="signupUser" type="email" required class="w-full px-4 py-3 rounded-lg text-white text-sm outline-none transition-all focus:ring-2 focus:ring-red-500" style="background:rgba(255,255,255,0.06); border:1px solid rgba(255,255,255,0.1);" placeholder="Choose your email">
+              </div>
+              <div>
+                <label for="signupName" class="text-gray-400 text-xs font-medium uppercase tracking-wider mb-1 block">Name</label>
+                <input id="signupName" type="text" required minlength="2" maxlength="40" class="w-full px-4 py-3 rounded-lg text-white text-sm outline-none transition-all focus:ring-2 focus:ring-red-500" style="background:rgba(255,255,255,0.06); border:1px solid rgba(255,255,255,0.1);" placeholder="Your racing name">
+              </div>
+              <div>
+                <label for="signupPass" class="text-gray-400 text-xs font-medium uppercase tracking-wider mb-1 block">Password</label>
+                <input id="signupPass" type="password" required minlength="4" class="w-full px-4 py-3 rounded-lg text-white text-sm outline-none transition-all focus:ring-2 focus:ring-red-500" style="background:rgba(255,255,255,0.06); border:1px solid rgba(255,255,255,0.1);" placeholder="Choose a password">
+              </div>
+              <div>
+                <label for="signupCountry" class="text-gray-400 text-xs font-medium uppercase tracking-wider mb-1 block">Country</label>
+                <select id="signupCountry" required class="w-full px-4 py-3 rounded-lg text-white text-sm outline-none transition-all focus:ring-2 focus:ring-red-500" style="background:rgba(255,255,255,0.06); border:1px solid rgba(255,255,255,0.1);">
+                  <option value="" disabled selected style="color:#999;">Select country</option>
+                  <option value="USA" style="color:#000;">USA</option>
+                  <option value="UK" style="color:#000;">UK</option>
+                  <option value="Germany" style="color:#000;">Germany</option>
+                  <option value="France" style="color:#000;">France</option>
+                  <option value="Italy" style="color:#000;">Italy</option>
+                  <option value="Spain" style="color:#000;">Spain</option>
+                  <option value="Netherlands" style="color:#000;">Netherlands</option>
+                  <option value="Brazil" style="color:#000;">Brazil</option>
+                  <option value="Australia" style="color:#000;">Australia</option>
+                  <option value="Japan" style="color:#000;">Japan</option>
+                  <option value="Mexico" style="color:#000;">Mexico</option>
+                  <option value="Canada" style="color:#000;">Canada</option>
+                  <option value="India" style="color:#000;">India</option>
+                  <option value="UAE" style="color:#000;">UAE</option>
+                  <option value="Singapore" style="color:#000;">Singapore</option>
+                  <option value="Monaco" style="color:#000;">Monaco</option>
+                  <option value="Other" style="color:#000;">Other</option>
+                </select>
+              </div>
+              <div id="signupError" class="text-red-400 text-xs hidden"></div>
+              <button type="submit" id="signupBtn" class="btn-race w-full py-3 rounded-lg text-white font-bold text-sm uppercase tracking-wider" style="background: linear-gradient(135deg, #e60000, #b30000);"> Join the Grid </button>
+            </form>
+
+            <p class="text-gray-600 text-xs text-center mt-4">Uses Supabase auth + database. No local demo storage.</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- DASHBOARD PAGE -->
+      <div id="dashboardPage" class="hidden">
+        <div class="max-w-4xl mx-auto px-4 py-8">
+          <div class="mb-8 anim-slide-up">
+            <h2 class="text-white text-2xl font-bold mb-1" style="font-family:'Orbitron',monospace;">Welcome back, <span id="dashUser" class="text-red-500"></span></h2>
+            <p class="text-gray-500 text-sm">Ready to hit the track?</p>
+          </div>
+
+          <!-- Stats Grid -->
+          <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-8">
+            <div class="rounded-xl p-4 text-center" style="background: linear-gradient(145deg, rgba(30,30,40,0.8), rgba(20,20,28,0.9)); border:1px solid rgba(255,255,255,0.06);">
+              <div class="text-gray-500 text-xs uppercase tracking-wider mb-1">Best Time</div>
+              <div id="statBest" class="text-2xl font-bold text-white" style="font-family:'Orbitron',monospace;">—</div>
+              <div class="text-gray-600 text-xs">ms</div>
+            </div>
+            <div class="rounded-xl p-4 text-center" style="background: linear-gradient(145deg, rgba(30,30,40,0.8), rgba(20,20,28,0.9)); border:1px solid rgba(255,255,255,0.06);">
+              <div class="text-gray-500 text-xs uppercase tracking-wider mb-1">Average</div>
+              <div id="statAvg" class="text-2xl font-bold text-white" style="font-family:'Orbitron',monospace;">—</div>
+              <div class="text-gray-600 text-xs">ms</div>
+            </div>
+            <div class="rounded-xl p-4 text-center" style="background: linear-gradient(145deg, rgba(30,30,40,0.8), rgba(20,20,28,0.9)); border:1px solid rgba(255,255,255,0.06);">
+              <div class="text-gray-500 text-xs uppercase tracking-wider mb-1">Races</div>
+              <div id="statTotal" class="text-2xl font-bold text-white" style="font-family:'Orbitron',monospace;">0</div>
+              <div class="text-gray-600 text-xs">total</div>
+            </div>
+            <div class="rounded-xl p-4 text-center" style="background: linear-gradient(145deg, rgba(30,30,40,0.8), rgba(20,20,28,0.9)); border:1px solid rgba(255,255,255,0.06);">
+              <div class="text-gray-500 text-xs uppercase tracking-wider mb-1">Today</div>
+              <div id="statRemaining" class="text-2xl font-bold" style="font-family:'Orbitron',monospace; color:#00ff66;">7</div>
+              <div class="text-gray-600 text-xs">attempts left</div>
+            </div>
+          </div>
+
+          <!-- Action Buttons -->
+          <div class="flex flex-col sm:flex-row gap-3 mb-8">
+            <button onclick="showPage('game')" class="btn-race flex-1 py-4 rounded-xl text-white font-bold text-lg uppercase tracking-wider flex items-center justify-center gap-3" style="background: linear-gradient(135deg, #e60000, #8b0000);">
+              <i data-lucide="zap" style="width:22px;height:22px;"></i> Start Race
+            </button>
+            <button onclick="showPage('leaderboard')" class="btn-race flex-1 py-4 rounded-xl text-white font-bold text-sm uppercase tracking-wider flex items-center justify-center gap-3" style="background: linear-gradient(145deg, rgba(30,30,40,0.8), rgba(20,20,28,0.9)); border:1px solid rgba(255,255,255,0.1);">
+              <i data-lucide="trophy" style="width:20px;height:20px;"></i> Leaderboard
+            </button>
+          </div>
+
+          <!-- Recent Attempts -->
+          <div class="rounded-xl p-5" style="background: linear-gradient(145deg, rgba(30,30,40,0.8), rgba(20,20,28,0.9)); border:1px solid rgba(255,255,255,0.06);">
+            <h3 class="text-white font-bold text-sm uppercase tracking-wider mb-4 flex items-center gap-2">
+              <i data-lucide="clock" style="width:16px;height:16px;color:#ff1a1a;"></i> Recent Attempts
+            </h3>
+            <div id="recentAttempts" class="space-y-2">
+              <p class="text-gray-600 text-sm text-center py-4">No attempts yet. Hit the track!</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- GAME PAGE -->
+      <div id="gamePage" class="hidden">
+        <div class="max-w-2xl mx-auto px-4 py-8 flex flex-col items-center">
+          <!-- Attempts Counter -->
+          <div class="mb-6 text-center">
+            <div class="text-gray-500 text-xs uppercase tracking-wider mb-1">Daily Attempts</div>
+            <div class="flex gap-2 justify-center" id="attemptDots"></div>
+          </div>
+
+          <!-- Light Panel -->
+          <div id="lightPanel" class="rounded-2xl p-6 sm:p-8 mb-6 w-full max-w-lg" style="background: linear-gradient(180deg, #1a1a24 0%, #0f0f17 100%); border:2px solid rgba(255,255,255,0.06);">
+            <div class="flex justify-center gap-3 sm:gap-5 mb-4">
+              <div id="light0" class="w-12 h-12 sm:w-16 sm:h-16 rounded-full light-off transition-all duration-100" style="border:2px solid rgba(255,255,255,0.1);"></div>
+              <div id="light1" class="w-12 h-12 sm:w-16 sm:h-16 rounded-full light-off transition-all duration-100" style="border:2px solid rgba(255,255,255,0.1);"></div>
+              <div id="light2" class="w-12 h-12 sm:w-16 sm:h-16 rounded-full light-off transition-all duration-100" style="border:2px solid rgba(255,255,255,0.1);"></div>
+              <div id="light3" class="w-12 h-12 sm:w-16 sm:h-16 rounded-full light-off transition-all duration-100" style="border:2px solid rgba(255,255,255,0.1);"></div>
+              <div id="light4" class="w-12 h-12 sm:w-16 sm:h-16 rounded-full light-off transition-all duration-100" style="border:2px solid rgba(255,255,255,0.1);"></div>
+            </div>
+            <div class="h-1 rounded-full mx-4" style="background: linear-gradient(90deg, rgba(255,26,26,0.3), rgba(255,26,26,0.1));"></div>
+          </div>
+
+          <!-- Game Message -->
+          <div id="gameMsg" class="text-center mb-6">
+            <div id="gameMsgText" class="text-gray-400 text-lg font-medium">Press START when ready</div>
+            <div id="gameTime" class="text-5xl sm:text-6xl font-black text-white mt-3 hidden" style="font-family:'Orbitron',monospace;"></div>
+            <div id="gameTimeLabel" class="text-gray-500 text-sm mt-1 hidden">milliseconds</div>
+          </div>
+
+          <!-- Game Button -->
+          <button id="gameBtn" onclick="handleGameClick()" class="btn-race w-full max-w-lg py-5 rounded-xl text-white font-bold text-xl uppercase tracking-widest" style="background: linear-gradient(135deg, #e60000, #8b0000);"> START </button>
+
+          <!-- Result Card -->
+          <div id="resultCard" class="hidden w-full max-w-lg mt-6 rounded-xl p-5 anim-slide-up" style="background: linear-gradient(145deg, rgba(30,30,40,0.8), rgba(20,20,28,0.9)); border:1px solid rgba(255,255,255,0.06);">
+            <div class="flex items-center justify-between">
+              <div>
+                <div id="resultLabel" class="text-gray-400 text-xs uppercase tracking-wider"></div>
+                <div id="resultTime" class="text-3xl font-black text-white" style="font-family:'Orbitron',monospace;"></div>
+              </div>
+              <div id="resultBadge" class="px-3 py-1 rounded-full text-xs font-bold uppercase"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- LEADERBOARD PAGE -->
+      <div id="leaderboardPage" class="hidden">
+        <div class="max-w-3xl mx-auto px-4 py-8">
+          <div class="flex items-center justify-between mb-6">
+            <h2 id="lbTitle" class="text-white text-2xl font-bold" style="font-family:'Orbitron',monospace;">LEADERBOARD</h2>
+            <div class="flex items-center gap-2 text-gray-500 text-xs">
+              <i data-lucide="users" style="width:14px;height:14px;"></i>
+              <span id="lbCount">0 racers</span>
+            </div>
+          </div>
+
+          <!-- Top 3 Podium -->
+          <div id="podium" class="hidden grid grid-cols-3 gap-3 mb-6">
+            <div class="rounded-xl p-4 text-center flex flex-col items-center justify-end" style="background: linear-gradient(145deg, rgba(30,30,40,0.8), rgba(20,20,28,0.9)); border:1px solid rgba(192,192,192,0.2); min-height:140px;">
+              <div class="text-3xl mb-1">🥈</div>
+              <div id="pod2Name" class="text-white text-sm font-bold truncate w-full"></div>
+              <div id="pod2Time" class="text-gray-400 text-xs" style="font-family:'Orbitron',monospace;"></div>
+              <div id="pod2Country" class="text-gray-600 text-xs mt-1"></div>
+            </div>
+
+            <div class="rounded-xl p-4 text-center flex flex-col items-center justify-end" style="background: linear-gradient(145deg, rgba(50,40,10,0.6), rgba(30,25,5,0.8)); border:1px solid rgba(255,215,0,0.3); min-height:170px;">
+              <div class="text-4xl mb-1">🥇</div>
+              <div id="pod1Name" class="text-white text-sm font-bold truncate w-full"></div>
+              <div id="pod1Time" class="text-yellow-400 text-xs font-bold" style="font-family:'Orbitron',monospace;"></div>
+              <div id="pod1Country" class="text-gray-500 text-xs mt-1"></div>
+            </div>
+
+            <div class="rounded-xl p-4 text-center flex flex-col items-center justify-end" style="background: linear-gradient(145deg, rgba(30,30,40,0.8), rgba(20,20,28,0.9)); border:1px solid rgba(205,127,50,0.2); min-height:120px;">
+              <div class="text-3xl mb-1">🥉</div>
+              <div id="pod3Name" class="text-white text-sm font-bold truncate w-full"></div>
+              <div id="pod3Time" class="text-gray-400 text-xs" style="font-family:'Orbitron',monospace;"></div>
+              <div id="pod3Country" class="text-gray-600 text-xs mt-1"></div>
+            </div>
+          </div>
+
+          <!-- Table -->
+          <div class="rounded-xl overflow-hidden" style="background: linear-gradient(145deg, rgba(30,30,40,0.8), rgba(20,20,28,0.9)); border:1px solid rgba(255,255,255,0.06);">
+            <div class="grid grid-cols-12 gap-2 px-4 py-3 text-gray-500 text-xs uppercase tracking-wider font-semibold" style="border-bottom:1px solid rgba(255,255,255,0.06);">
+              <div class="col-span-1">#</div>
+              <div class="col-span-5">Driver</div>
+              <div class="col-span-3">Country</div>
+              <div class="col-span-3 text-right">Best Time</div>
+            </div>
+            <div id="lbList" class="max-h-96 overflow-auto scrollbar-thin">
+              <div class="text-gray-600 text-sm text-center py-8">No times recorded yet</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <script type="module">
+      import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
+
+      // IMPORTANT: paste your Supabase project values below.
+      const SUPABASE_URL = 'https://ooqbvakuiytgggushvmc.supabase.co';
+      const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9vcWJ2YWt1aXl0Z2dndXNodm1jIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM5ODExMzEsImV4cCI6MjA4OTU1NzEzMX0.8yBjZ_d1s4ijq0pRWg8XcZ6-WfphHhvDrjJCxct5WGM';
+      const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+      // ===== APP STATE =====
+      let currentUser = null; // { id, email, country }
+      let userRacesCount = 0;
+      let userBestTime = null;
+      let userAvgTime = null;
+      let todayRacesCount = 0;
+      let recentAttempts = [];
+      let leaderboardRows = []; // { user_id, username, country, time }
+
+      const MAX_DAILY = 7;
+      const MIN_VALID_MS = 100;
+
+      // ===== GAME STATE =====
+      let gameState = 'idle'; // idle, countdown, waiting, go, done, falseStart
+      let lightTimers = [];
+      let goTimeout = null;
+      let goTimestamp = 0;
+
+      function showToast(msg, type = 'success') {
+        const c = document.getElementById('toastContainer');
+        const t = document.createElement('div');
+        t.className = `toast toast-${type}`;
+        t.textContent = msg;
+        c.appendChild(t);
+        setTimeout(() => {
+          t.style.opacity = '0';
+          t.style.transition = 'opacity 0.3s';
+          setTimeout(() => t.remove(), 300);
+        }, 3000);
+      }
+
+      function getTodayKey() {
+        const d = new Date();
+        return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}-${String(d.getUTCDate()).padStart(2, '0')}`;
+      }
+
+      function setNavUser() {
+        const navUsername = document.getElementById('navUsername');
+        const navAvatar = document.getElementById('navAvatar');
+        if (!currentUser) return;
+        navUsername.textContent = currentUser.name || currentUser.email;
+        navAvatar.textContent = (currentUser.name || currentUser.email || '?').charAt(0).toUpperCase();
+      }
+
+      async function refreshDashboard() {
+        if (!currentUser) return;
+
+        const userId = currentUser.id;
+        const todayKey = getTodayKey();
+
+        // Run in parallel: counts, best, avg, recent
+        const [totalRaces, todayRaces, bestRes, validAttempts, recentRes] = await Promise.all([
+          supabase
+            .from('attempts')
+            .select('id', { count: 'exact', head: true })
+            .eq('user_id', userId)
+            .gt('reaction_time_ms', 0),
+
+          supabase
+            .from('attempts')
+            .select('id', { count: 'exact', head: true })
+            .eq('user_id', userId)
+            .eq('date_key', todayKey)
+            .gt('reaction_time_ms', 0),
+
+          supabase
+            .from('leaderboard_best_times')
+            .select('best_time_ms')
+            .eq('user_id', userId)
+            .maybeSingle(),
+
+          supabase
+            .from('attempts')
+            .select('reaction_time_ms')
+            .eq('user_id', userId)
+            .eq('is_valid', true)
+            .gt('reaction_time_ms', 0),
+
+          supabase
+            .from('attempts')
+            .select('reaction_time_ms,is_valid,is_false_start,created_at')
+            .eq('user_id', userId)
+            .gt('reaction_time_ms', 0)
+            .order('created_at', { ascending: false })
+            .limit(5)
+        ]);
+
+        if (totalRaces.error) throw totalRaces.error;
+        if (todayRaces.error) throw todayRaces.error;
+        if (bestRes.error) throw bestRes.error;
+        if (validAttempts.error) throw validAttempts.error;
+        if (recentRes.error) throw recentRes.error;
+
+        userRacesCount = totalRaces.count || 0;
+        todayRacesCount = todayRaces.count || 0;
+        userBestTime = bestRes.data?.best_time_ms ?? null;
+
+        const validTimes = (validAttempts.data || []).map(r => r.reaction_time_ms).filter(n => typeof n === 'number');
+        userAvgTime = validTimes.length > 0 ? Math.round(validTimes.reduce((s, n) => s + n, 0) / validTimes.length) : null;
+
+        recentAttempts = recentRes.data || [];
+
+        // Render
+        document.getElementById('dashUser').textContent = currentUser.name || currentUser.email;
+        document.getElementById('statBest').textContent = userBestTime !== null ? userBestTime : '—';
+        document.getElementById('statAvg').textContent = userAvgTime !== null ? userAvgTime : '—';
+        document.getElementById('statTotal').textContent = userRacesCount;
+        document.getElementById('statRemaining').textContent = Math.max(0, MAX_DAILY - todayRacesCount);
+
+        const recentEl = document.getElementById('recentAttempts');
+        if (recentAttempts.length === 0) {
+          recentEl.innerHTML = '<p class="text-gray-600 text-sm text-center py-4">No attempts yet. Hit the track!</p>';
+          return;
+        }
+
+        recentEl.innerHTML = recentAttempts
+          .slice()
+          .reverse()
+          .map(a => {
+            const time = a.is_false_start ? 'FALSE START' : `${a.reaction_time_ms}ms`;
+            const color = a.is_false_start
+              ? 'text-red-400'
+              : a.is_valid
+                ? (a.reaction_time_ms < 250 ? 'text-green-400' : 'text-white')
+                : 'text-yellow-400';
+            const date = new Date(a.created_at);
+            const dateStr = date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+            return `<div class="flex items-center justify-between py-2 px-3 rounded-lg" style="background:rgba(255,255,255,0.03);">
+              <span class="text-gray-500 text-xs">${dateStr}</span>
+              <span class="${color} font-bold text-sm" style="font-family:'Orbitron',monospace;">${time}</span>
+            </div>`;
+          })
+          .join('');
+      }
+
+      async function refreshLeaderboard() {
+        const { data, error } = await supabase
+          .from('leaderboard_best_times')
+          .select('user_id,display_name,country,best_time_ms')
+          .order('best_time_ms', { ascending: true })
+          .limit(100);
+
+        if (error) throw error;
+
+        leaderboardRows = (data || [])
+          .filter(r => typeof r.best_time_ms === 'number' && r.best_time_ms >= MIN_VALID_MS)
+          .map(r => ({
+            user_id: r.user_id,
+            name: r.display_name || r.email,
+            country: r.country || 'Other',
+            time: r.best_time_ms
+          }));
+
+        renderLeaderboard();
+      }
+
+      function renderLeaderboard() {
+        const sorted = leaderboardRows;
+        document.getElementById('lbCount').textContent = sorted.length + ' racer' + (sorted.length !== 1 ? 's' : '');
+
+        const podium = document.getElementById('podium');
+        if (sorted.length >= 3) {
+          podium.classList.remove('hidden');
+          [1, 0, 2].forEach(rank => {
+            const p = sorted[rank];
+            if (!p) return;
+            document.getElementById('pod' + (rank + 1) + 'Name').textContent = p.name;
+            document.getElementById('pod' + (rank + 1) + 'Time').textContent = p.time + 'ms';
+            document.getElementById('pod' + (rank + 1) + 'Country').textContent = p.country;
+          });
+        } else {
+          podium.classList.add('hidden');
+        }
+
+        const list = document.getElementById('lbList');
+        if (sorted.length === 0) {
+          list.innerHTML = '<div class="text-gray-600 text-sm text-center py-8">No valid times recorded yet. Be the first!</div>';
+          return;
+        }
+
+        list.innerHTML = sorted
+          .map((p, i) => {
+            const rankClass = i === 0 ? 'rank-gold' : i === 1 ? 'rank-silver' : i === 2 ? 'rank-bronze' : '';
+            const isMe = currentUser && p.user_id === currentUser.id;
+            const highlight = isMe ? 'background:rgba(255,26,26,0.08);' : '';
+            const timeColor = p.time < 200 ? '#00ff66' : p.time < 300 ? '#a3e635' : '#ffffff';
+            return `<div class="grid grid-cols-12 gap-2 px-4 py-3 items-center text-sm transition-colors hover:bg-white/[0.02]" style="${highlight}border-bottom:1px solid rgba(255,255,255,0.03);">
+              <div class="col-span-1 ${rankClass} font-bold" style="font-family:'Orbitron',monospace;">${i + 1}</div>
+              <div class="col-span-5 text-white font-medium truncate ${isMe ? 'text-red-400' : ''}">${p.name}${isMe ? ' (you)' : ''}</div>
+              <div class="col-span-3 text-gray-500 text-xs">${p.country}</div>
+              <div class="col-span-3 text-right font-bold" style="font-family:'Orbitron',monospace; color:${timeColor};">${p.time}ms</div>
+            </div>`;
+          })
+          .join('');
+      }
+
+      function getAttemptsRemaining() {
+        return Math.max(0, MAX_DAILY - todayRacesCount);
+      }
+
+      function updateGameAttemptsUI() {
+        const remaining = getAttemptsRemaining();
+        const dots = document.getElementById('attemptDots');
+        let html = '';
+        for (let i = 0; i < MAX_DAILY; i++) {
+          const used = i < (MAX_DAILY - remaining);
+          html += `<div class="w-3 h-3 rounded-full transition-all" style="background:${used ? 'rgba(255,255,255,0.15)' : '#ff1a1a'}; ${!used ? 'box-shadow:0 0 8px rgba(255,26,26,0.4);' : ''}"></div>`;
+        }
+        dots.innerHTML = html;
+
+        const btn = document.getElementById('gameBtn');
+        if (remaining <= 0 && gameState === 'idle') {
+          document.getElementById('gameMsgText').textContent = 'No attempts remaining today. Come back tomorrow!';
+          btn.disabled = true;
+          btn.style.opacity = '0.4';
+          btn.textContent = 'NO ATTEMPTS LEFT';
+        } else {
+          btn.disabled = false;
+          btn.style.opacity = '1';
+        }
+      }
+
+      function resetGame() {
+        gameState = 'idle';
+
+        lightTimers.forEach(t => clearTimeout(t));
+        lightTimers = [];
+
+        if (goTimeout) clearTimeout(goTimeout);
+        goTimeout = null;
+        goTimestamp = 0;
+
+        for (let i = 0; i < 5; i++) {
+          const l = document.getElementById('light' + i);
+          l.className = (l.className.replace(/light-on|light-green/g, '') + ' light-off').trim();
+        }
+
+        document.getElementById('gameTime').classList.add('hidden');
+        document.getElementById('gameTimeLabel').classList.add('hidden');
+        document.getElementById('resultCard').classList.add('hidden');
+
+        document.getElementById('gameMsgText').textContent = 'Press START when ready';
+        document.getElementById('gameMsgText').style.color = '#9ca3af';
+
+        const btn = document.getElementById('gameBtn');
+        btn.textContent = 'START';
+        btn.disabled = false;
+        btn.style.opacity = '1';
+        btn.style.background = 'linear-gradient(135deg, #e60000, #8b0000)';
+      }
+
+      function handleGameClick() {
+        const btn = document.getElementById('gameBtn');
+        if (btn.disabled) return;
+
+        if (gameState === 'idle') {
+          startSequence();
+        } else if (gameState === 'countdown' || gameState === 'waiting') {
+          falseStart();
+        } else if (gameState === 'go') {
+          recordReaction();
+        } else if (gameState === 'done' || gameState === 'falseStart') {
+          resetGame();
+          updateGameAttemptsUI();
+        }
+      }
+
+      function startSequence() {
+        if (getAttemptsRemaining() <= 0) {
+          showToast('No attempts left today!', 'warning');
+          return;
+        }
+
+        gameState = 'countdown';
+        document.getElementById('gameMsgText').textContent = 'Wait for lights out...';
+        document.getElementById('gameBtn').textContent = 'WAIT...';
+        document.getElementById('resultCard').classList.add('hidden');
+        document.getElementById('gameTime').classList.add('hidden');
+        document.getElementById('gameTimeLabel').classList.add('hidden');
+
+        for (let i = 0; i < 5; i++) {
+          const timer = setTimeout(() => {
+            if (gameState !== 'countdown') return;
+            const l = document.getElementById('light' + i);
+            l.classList.remove('light-off');
+            l.classList.add('light-on');
+            if (i === 4) {
+              gameState = 'waiting';
+              const delay = 2000 + Math.random() * 3000; // 2-5s
+              goTimeout = setTimeout(() => {
+                if (gameState !== 'waiting') return;
+                lightsOut();
+              }, delay);
+            }
+          }, (i + 1) * 800);
+          lightTimers.push(timer);
+        }
+      }
+
+      function lightsOut() {
+        gameState = 'go';
+        goTimestamp = performance.now();
+
+        for (let i = 0; i < 5; i++) {
+          const l = document.getElementById('light' + i);
+          l.classList.remove('light-on');
+          l.classList.add('light-green');
+        }
+
+        const msg = document.getElementById('gameMsgText');
+        msg.textContent = 'GO! GO! GO!';
+        msg.style.color = '#00ff66';
+
+        const btn = document.getElementById('gameBtn');
+        btn.textContent = 'REACT!';
+        btn.style.background = 'linear-gradient(135deg, #00cc52, #008836)';
+      }
+
+      function falseStart() {
+        gameState = 'falseStart';
+
+        lightTimers.forEach(t => clearTimeout(t));
+        lightTimers = [];
+        if (goTimeout) clearTimeout(goTimeout);
+
+        for (let i = 0; i < 5; i++) {
+          const l = document.getElementById('light' + i);
+          l.classList.remove('light-on', 'light-green');
+          l.classList.add('light-off');
+        }
+
+        const panel = document.getElementById('lightPanel');
+        panel.classList.add('anim-shake');
+        setTimeout(() => panel.classList.remove('anim-shake'), 500);
+
+        document.getElementById('gameMsgText').textContent = 'FALSE START!';
+        document.getElementById('gameMsgText').style.color = '#ff1a1a';
+
+        const btn = document.getElementById('gameBtn');
+        btn.textContent = 'TRY AGAIN';
+        btn.style.background = 'linear-gradient(135deg, #e60000, #8b0000)';
+
+        showResultCard(0, true);
+        void saveAttempt(0, false, true);
+      }
+
+      function recordReaction() {
+        const elapsed = Math.round(performance.now() - goTimestamp);
+        gameState = 'done';
+
+        for (let i = 0; i < 5; i++) {
+          const l = document.getElementById('light' + i);
+          l.classList.remove('light-green');
+          l.classList.add('light-off');
+        }
+
+        const isValid = elapsed >= MIN_VALID_MS;
+
+        document.getElementById('gameTime').textContent = elapsed;
+        document.getElementById('gameTime').classList.remove('hidden');
+        document.getElementById('gameTime').classList.add('anim-pop');
+        document.getElementById('gameTimeLabel').classList.remove('hidden');
+
+        document.getElementById('gameMsgText').textContent = isValid ? 'Reaction Time' : 'Suspiciously fast...';
+        document.getElementById('gameMsgText').style.color = isValid ? '#a0a0b0' : '#d97706';
+
+        const btn = document.getElementById('gameBtn');
+        btn.textContent = 'RACE AGAIN';
+        btn.style.background = 'linear-gradient(135deg, #e60000, #8b0000)';
+
+        const timeEl = document.getElementById('gameTime');
+        if (elapsed < 200) timeEl.style.color = '#00ff66';
+        else if (elapsed < 300) timeEl.style.color = '#66ff99';
+        else if (elapsed < 400) timeEl.style.color = '#ffffff';
+        else timeEl.style.color = '#ff6666';
+
+        showResultCard(elapsed, false, isValid);
+        void saveAttempt(elapsed, isValid, false);
+      }
+
+      function showResultCard(time, isFalseStart, isValid) {
+        const card = document.getElementById('resultCard');
+        card.classList.remove('hidden');
+
+        const label = document.getElementById('resultLabel');
+        const timeEl = document.getElementById('resultTime');
+        const badge = document.getElementById('resultBadge');
+
+        if (isFalseStart) {
+          label.textContent = 'Result';
+          timeEl.textContent = 'JUMP START';
+          timeEl.style.color = '#ff1a1a';
+          badge.textContent = 'Invalid';
+          badge.style.background = 'rgba(220,38,38,0.2)';
+          badge.style.color = '#ff6666';
+          badge.className = 'px-3 py-1 rounded-full text-xs font-bold uppercase';
+          return;
+        }
+
+        if (!isValid) {
+          label.textContent = 'Result';
+          timeEl.textContent = time + 'ms';
+          timeEl.style.color = '#d97706';
+          badge.textContent = 'Too Fast';
+          badge.style.background = 'rgba(217,119,6,0.2)';
+          badge.style.color = '#fbbf24';
+          return;
+        }
+
+        label.textContent = 'Your Time';
+        timeEl.textContent = time + 'ms';
+
+        let rating, rColor, rBg;
+        if (time < 200) { rating = 'Incredible'; rColor = '#00ff66'; rBg = 'rgba(0,255,102,0.15)'; }
+        else if (time < 250) { rating = 'Excellent'; rColor = '#66ff99'; rBg = 'rgba(102,255,153,0.15)'; }
+        else if (time < 300) { rating = 'Good'; rColor = '#a3e635'; rBg = 'rgba(163,230,53,0.15)'; }
+        else if (time < 400) { rating = 'Average'; rColor = '#fbbf24'; rBg = 'rgba(251,191,36,0.15)'; }
+        else { rating = 'Slow'; rColor = '#ff6666'; rBg = 'rgba(255,102,102,0.15)'; }
+
+        timeEl.style.color = rColor;
+        badge.textContent = rating;
+        badge.style.background = rBg;
+        badge.style.color = rColor;
+      }
+
+      async function saveAttempt(time, isValid, isFalseStart) {
+        if (!currentUser) return;
+        const btn = document.getElementById('gameBtn');
+        btn.disabled = true;
+
+        // Insert attempt row. user_best_times is updated by a DB trigger.
+        const payload = {
+          user_id: currentUser.id,
+          email: currentUser.email,
+          country: currentUser.country || 'Other',
+          reaction_time_ms: time,
+          is_valid: isValid,
+          is_false_start: isFalseStart,
+          created_at: new Date().toISOString(),
+          date_key: getTodayKey()
+        };
+
+        try {
+          const { error } = await supabase.from('attempts').insert(payload);
+          if (error) throw error;
+
+          // Refresh UI based on authoritative DB state.
+          await Promise.all([refreshDashboard(), refreshLeaderboard()]);
+          updateGameAttemptsUI();
+        } catch (err) {
+          console.error(err);
+          showToast('Could not save attempt', 'error');
+        } finally {
+          btn.disabled = false;
+        }
+      }
+
+      // ===== AUTH =====
+      function switchAuthTab(tab) {
+        const tl = document.getElementById('tabLogin');
+        const ts = document.getElementById('tabSignup');
+        const fl = document.getElementById('loginForm');
+        const fs = document.getElementById('signupForm');
+
+        if (tab === 'login') {
+          tl.className = 'flex-1 pb-3 text-sm font-semibold tab-active';
+          ts.className = 'flex-1 pb-3 text-sm font-semibold text-gray-500';
+          fl.classList.remove('hidden');
+          fs.classList.add('hidden');
+        } else {
+          ts.className = 'flex-1 pb-3 text-sm font-semibold tab-active';
+          tl.className = 'flex-1 pb-3 text-sm font-semibold text-gray-500';
+          fs.classList.remove('hidden');
+          fl.classList.add('hidden');
+        }
+      }
+
+      async function loadProfile(user) {
+        // Ensures currentUser exists even after page reload.
+        const { data: profile, error } = await supabase
+          .from('profiles')
+          .select('user_id,email,display_name,country')
+          .eq('user_id', user.id)
+          .maybeSingle();
+
+        if (error) throw error;
+
+        // If profile row isn't created (for example, if email confirmations were enabled),
+        // create a minimal one using the user's email.
+        if (!profile) {
+          const email = user.email || 'unknown@example.com';
+          const { error: insertErr } = await supabase
+            .from('profiles')
+            .insert({ user_id: user.id, email, display_name: email, country: 'Other' });
+          if (insertErr) throw insertErr;
+          return { id: user.id, email, name: email, country: 'Other' };
+        }
+
+        return {
+          id: profile.user_id,
+          email: profile.email,
+          name: profile.display_name && profile.display_name !== 'Racer' ? profile.display_name : profile.email,
+          country: profile.country || 'Other'
+        };
+      }
+
+      async function handleLogin(e) {
+        e.preventDefault();
+        const email = document.getElementById('loginUser').value.trim();
+        const password = document.getElementById('loginPass').value.trim();
+        const errEl = document.getElementById('loginError');
+        errEl.classList.add('hidden');
+        errEl.textContent = '';
+
+        const loginBtn = document.getElementById('loginBtn');
+        loginBtn.disabled = true;
+        loginBtn.textContent = 'Signing in...';
+
+        try {
+          const { error } = await supabase.auth.signInWithPassword({ email, password });
+          if (error) throw error;
+
+          const { data } = await supabase.auth.getUser();
+          currentUser = await loadProfile(data.user);
+
+          setNavUser();
+          await Promise.all([refreshDashboard(), refreshLeaderboard()]);
+          showPage('dashboard');
+        } catch (err) {
+          console.error(err);
+          errEl.textContent = err?.message || 'Login failed. Please try again.';
+          errEl.classList.remove('hidden');
+        } finally {
+          loginBtn.disabled = false;
+          loginBtn.textContent = 'Start Engine';
+        }
+      }
+
+      async function handleSignup(e) {
+        e.preventDefault();
+        const email = document.getElementById('signupUser').value.trim();
+        const displayName = document.getElementById('signupName').value.trim();
+        const password = document.getElementById('signupPass').value.trim();
+        const country = document.getElementById('signupCountry').value;
+        const errEl = document.getElementById('signupError');
+        errEl.classList.add('hidden');
+        errEl.textContent = '';
+
+        const signupBtn = document.getElementById('signupBtn');
+        signupBtn.disabled = true;
+        signupBtn.textContent = 'Creating...';
+
+        try {
+          const { data, error } = await supabase.auth.signUp({ email, password });
+          if (error) throw error;
+
+          const { data: sessionData } = await supabase.auth.getSession();
+
+          // With email confirmations enabled, a session may not exist yet.
+          if (!sessionData?.session?.user) {
+            showToast('Check your email to confirm your account.', 'warning');
+            showPage('login');
+            return;
+          }
+
+          currentUser = await loadProfile(sessionData.session.user);
+
+          // Store the country selected in the signup form.
+          const { error: updateErr } = await supabase
+            .from('profiles')
+            .upsert(
+              {
+                user_id: currentUser.id,
+                email: currentUser.email,
+                country: country || 'Other',
+                display_name: displayName
+              },
+              { onConflict: 'user_id' }
+            );
+          if (updateErr) throw updateErr;
+
+          currentUser.country = country || 'Other';
+          currentUser.name = displayName;
+          setNavUser();
+          await Promise.all([refreshDashboard(), refreshLeaderboard()]);
+          showPage('dashboard');
+        } catch (err) {
+          console.error(err);
+          errEl.textContent = err?.message || 'Signup failed. Please try again.';
+          errEl.classList.remove('hidden');
+        } finally {
+          signupBtn.disabled = false;
+          signupBtn.textContent = 'Join the Grid';
+        }
+      }
+
+      async function logout() {
+        currentUser = null;
+        try {
+          await supabase.auth.signOut();
+        } catch (err) {
+          console.error(err);
+        }
+        resetGame();
+        showPage('login');
+      }
+
+      // ===== NAVIGATION =====
+      async function showPage(page) {
+        const pages = ['loginPage', 'dashboardPage', 'gamePage', 'leaderboardPage'];
+        pages.forEach(p => document.getElementById(p).classList.add('hidden'));
+
+        const nav = document.getElementById('mainNav');
+
+        if (page === 'login') {
+          document.getElementById('loginPage').classList.remove('hidden');
+          nav.classList.add('hidden');
+          return;
+        }
+
+        nav.classList.remove('hidden');
+
+        if (!currentUser) {
+          showPage('login');
+          return;
+        }
+
+        setNavUser();
+
+        if (page === 'dashboard') {
+          document.getElementById('dashboardPage').classList.remove('hidden');
+          await refreshDashboard();
+        } else if (page === 'game') {
+          document.getElementById('gamePage').classList.remove('hidden');
+          resetGame();
+          await refreshDashboard();
+          updateGameAttemptsUI();
+        } else if (page === 'leaderboard') {
+          document.getElementById('leaderboardPage').classList.remove('hidden');
+          await refreshLeaderboard();
+        }
+
+        lucide.createIcons();
+      }
+
+      // Attach inline handlers from markup.
+      window.showPage = showPage;
+      window.logout = logout;
+      window.switchAuthTab = switchAuthTab;
+      window.handleLogin = handleLogin;
+      window.handleSignup = handleSignup;
+      window.handleGameClick = handleGameClick;
+
+      // ===== BOOTSTRAP =====
+      async function bootstrap() {
+        if (!SUPABASE_URL || SUPABASE_URL.includes('PASTE_')) {
+          showToast('Set SUPABASE_URL and SUPABASE_ANON_KEY in index.html first.', 'warning');
+          document.getElementById('loginPage').classList.remove('hidden');
+          return;
+        }
+
+        try {
+          const { data: { session } } = await supabase.auth.getSession();
+          if (session?.user) {
+            currentUser = await loadProfile(session.user);
+            setNavUser();
+            await Promise.all([refreshDashboard(), refreshLeaderboard()]);
+            await showPage('dashboard');
+          } else {
+            showPage('login');
+          }
+
+          supabase.auth.onAuthStateChange(async (_event, session) => {
+            if (session?.user) {
+              currentUser = await loadProfile(session.user);
+              setNavUser();
+              await Promise.all([refreshDashboard(), refreshLeaderboard()]);
+              await showPage(currentPageAfterAuth());
+            } else {
+              currentUser = null;
+              resetGame();
+              await showPage('login');
+            }
+          });
+        } catch (err) {
+          console.error(err);
+          showToast('Auth init failed. Check Supabase config.', 'error');
+          showPage('login');
+        }
+      }
+
+      function currentPageAfterAuth() {
+        // Keep the UI on dashboard after login to reduce flicker.
+        return 'dashboard';
+      }
+
+      lucide.createIcons();
+      bootstrap();
+    </script>
+  </body>
+</html>
+
