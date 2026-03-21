@@ -300,6 +300,7 @@
               </div>
               <div id="resultBadge" class="px-3 py-1 rounded-full text-xs font-bold uppercase"></div>
             </div>
+            <div id="resultPercentile" class="hidden text-center text-sm mt-4 px-2" style="font-family:'Barlow',sans-serif; color:#9ca3af;"></div>
           </div>
         </div>
       </div>
@@ -307,11 +308,18 @@
       <!-- LEADERBOARD PAGE -->
       <div id="leaderboardPage" class="hidden">
         <div class="max-w-3xl mx-auto px-4 py-8">
-          <div class="flex items-center justify-between mb-6">
-            <h2 id="lbTitle" class="text-white text-2xl font-bold" style="font-family:'Orbitron',monospace;">LEADERBOARD</h2>
-            <div class="flex items-center gap-2 text-gray-500 text-xs">
-              <i data-lucide="users" style="width:14px;height:14px;"></i>
-              <span id="lbCount">0 racers</span>
+          <div class="flex flex-col gap-4 mb-6">
+            <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+              <h2 id="lbTitle" class="text-white text-2xl font-bold" style="font-family:'Orbitron',monospace;">LEADERBOARD</h2>
+              <div class="flex items-center gap-2 text-gray-500 text-xs">
+                <i data-lucide="users" style="width:14px;height:14px;"></i>
+                <span id="lbCount">0 racers</span>
+              </div>
+            </div>
+            <div class="flex flex-wrap gap-2">
+              <button type="button" id="lbTabToday" onclick="setLeaderboardMode('today')" class="lb-tab px-4 py-2 rounded-lg text-xs font-bold uppercase tracking-wider transition-colors" style="background:rgba(255,255,255,0.06); border:1px solid rgba(255,255,255,0.1); color:#9ca3af;">Today</button>
+              <button type="button" id="lbTabAlltime" onclick="setLeaderboardMode('alltime')" class="lb-tab px-4 py-2 rounded-lg text-xs font-bold uppercase tracking-wider transition-colors" style="background:rgba(255,26,26,0.15); border:1px solid rgba(255,26,26,0.35); color:#ff1a1a;">All-time best</button>
+              <button type="button" id="lbTabAvg" onclick="setLeaderboardMode('average')" class="lb-tab px-4 py-2 rounded-lg text-xs font-bold uppercase tracking-wider transition-colors" style="background:rgba(255,255,255,0.06); border:1px solid rgba(255,255,255,0.1); color:#9ca3af;">Best average</button>
             </div>
           </div>
 
@@ -345,7 +353,7 @@
               <div class="col-span-1">#</div>
               <div class="col-span-5">Driver</div>
               <div class="col-span-3">Country</div>
-              <div class="col-span-3 text-right">Best Time</div>
+              <div id="lbColTime" class="col-span-3 text-right">Best Time</div>
             </div>
             <div id="lbList" class="max-h-96 overflow-auto scrollbar-thin">
               <div class="text-gray-600 text-sm text-center py-8">No times recorded yet</div>
@@ -370,10 +378,11 @@
       let userAvgTime = null;
       let todayRacesCount = 0;
       let recentAttempts = [];
-      let leaderboardRows = []; // { user_id, username, country, time }
+      let leaderboardRows = []; // { user_id, name, country, time }
+      let leaderboardMode = 'alltime'; // 'today' | 'alltime' | 'average'
 
       const MAX_DAILY = 7;
-      const MIN_VALID_MS = 10;
+      const MIN_VALID_MS = 100;
 
       // ===== GAME STATE =====
       let gameState = 'idle'; // idle, countdown, waiting, go, done, falseStart
@@ -498,7 +507,90 @@
           .join('');
       }
 
-      async function refreshLeaderboard() {
+      async function fetchAllBestTimesMs() {
+        const all = [];
+        let from = 0;
+        const pageSize = 1000;
+        while (true) {
+          const { data, error } = await supabase
+            .from('leaderboard_best_times')
+            .select('best_time_ms')
+            .order('best_time_ms', { ascending: true })
+            .range(from, from + pageSize - 1);
+          if (error) throw error;
+          if (!data?.length) break;
+          for (const row of data) {
+            if (typeof row.best_time_ms === 'number' && row.best_time_ms >= MIN_VALID_MS) {
+              all.push(row.best_time_ms);
+            }
+          }
+          if (data.length < pageSize) break;
+          from += pageSize;
+        }
+        return all;
+      }
+
+      /** Percentage of racers whose *personal best* is slower (higher ms) than this run. */
+      function percentileFasterThanRacers(myMs, allBests) {
+        if (!allBests.length) return null;
+        const slower = allBests.filter((t) => t > myMs).length;
+        return Math.min(100, Math.max(0, Math.round((100 * slower) / allBests.length)));
+      }
+
+      async function showFasterThanPercentile(myMs) {
+        const el = document.getElementById('resultPercentile');
+        if (!el) return;
+        el.classList.remove('hidden');
+        el.textContent = 'Calculating…';
+        try {
+          const bests = await fetchAllBestTimesMs();
+          const pct = percentileFasterThanRacers(myMs, bests);
+          if (pct === null) {
+            el.classList.add('hidden');
+            el.textContent = '';
+            return;
+          }
+          el.textContent = `Faster than ${pct}% of racers (by best time)`;
+          el.style.color = '#9ca3af';
+        } catch (e) {
+          console.error(e);
+          el.classList.add('hidden');
+          el.textContent = '';
+        }
+      }
+
+      function updateLeaderboardTabStyles() {
+        const tabs = {
+          today: document.getElementById('lbTabToday'),
+          alltime: document.getElementById('lbTabAlltime'),
+          average: document.getElementById('lbTabAvg')
+        };
+        const active =
+          'background:rgba(255,26,26,0.15); border:1px solid rgba(255,26,26,0.35); color:#ff1a1a;';
+        const inactive =
+          'background:rgba(255,255,255,0.06); border:1px solid rgba(255,255,255,0.1); color:#9ca3af;';
+        Object.keys(tabs).forEach((key) => {
+          const b = tabs[key];
+          if (!b) return;
+          b.style.cssText =
+            (leaderboardMode === key ? active : inactive) +
+            ' padding:0.5rem 1rem; border-radius:0.5rem; font-size:0.75rem; font-weight:700; text-transform:uppercase; letter-spacing:0.05em; cursor:pointer;';
+        });
+        const col = document.getElementById('lbColTime');
+        if (col) {
+          if (leaderboardMode === 'average') col.textContent = 'Avg Time';
+          else col.textContent = 'Best Time';
+        }
+      }
+
+      async function setLeaderboardMode(mode) {
+        leaderboardMode = mode;
+        updateLeaderboardTabStyles();
+        await refreshLeaderboard();
+        lucide.createIcons();
+      }
+
+      async function refreshLeaderboardAllTime() {
         const { data, error } = await supabase
           .from('leaderboard_best_times')
           .select('user_id,display_name,country,best_time_ms')
@@ -508,8 +600,8 @@
         if (error) throw error;
 
         leaderboardRows = (data || [])
-          .filter(r => typeof r.best_time_ms === 'number' && r.best_time_ms >= MIN_VALID_MS)
-          .map(r => ({
+          .filter((r) => typeof r.best_time_ms === 'number' && r.best_time_ms >= MIN_VALID_MS)
+          .map((r) => ({
             user_id: r.user_id,
             name: r.display_name || r.email,
             country: r.country || 'Other',
@@ -519,6 +611,67 @@
         renderLeaderboard();
       }
 
+      async function refreshLeaderboardToday() {
+        const todayKey = getTodayKey();
+        const { data, error } = await supabase
+          .from('attempts')
+          .select('user_id,reaction_time_ms,email,country,display_name')
+          .eq('date_key', todayKey)
+          .eq('is_valid', true)
+          .eq('is_false_start', false)
+          .gte('reaction_time_ms', MIN_VALID_MS);
+
+        if (error) throw error;
+
+        const byUser = new Map();
+        for (const row of data || []) {
+          const rawName = row.display_name && String(row.display_name).trim();
+          const name = rawName || row.email || 'Racer';
+          const country = row.country || 'Other';
+          const t = row.reaction_time_ms;
+          if (typeof t !== 'number') continue;
+          const prev = byUser.get(row.user_id);
+          if (!prev || t < prev.time) {
+            byUser.set(row.user_id, { user_id: row.user_id, name, country, time: t });
+          }
+        }
+
+        leaderboardRows = Array.from(byUser.values()).sort((a, b) => a.time - b.time).slice(0, 100);
+        renderLeaderboard();
+      }
+
+      async function refreshLeaderboardAverage() {
+        const { data, error } = await supabase
+          .from('leaderboard_avg_times')
+          .select('user_id,display_name,country,avg_time_ms')
+          .order('avg_time_ms', { ascending: true })
+          .limit(100);
+
+        if (error) throw error;
+
+        leaderboardRows = (data || [])
+          .filter((r) => typeof r.avg_time_ms === 'number' && r.avg_time_ms >= MIN_VALID_MS)
+          .map((r) => ({
+            user_id: r.user_id,
+            name: r.display_name || r.email,
+            country: r.country || 'Other',
+            time: r.avg_time_ms
+          }));
+
+        renderLeaderboard();
+      }
+
+      async function refreshLeaderboard() {
+        updateLeaderboardTabStyles();
+        if (leaderboardMode === 'today') {
+          await refreshLeaderboardToday();
+        } else if (leaderboardMode === 'average') {
+          await refreshLeaderboardAverage();
+        } else {
+          await refreshLeaderboardAllTime();
+        }
+      }
+
       function renderLeaderboard() {
         const sorted = leaderboardRows;
         document.getElementById('lbCount').textContent = sorted.length + ' racer' + (sorted.length !== 1 ? 's' : '');
@@ -526,11 +679,12 @@
         const podium = document.getElementById('podium');
         if (sorted.length >= 3) {
           podium.classList.remove('hidden');
-          [1, 0, 2].forEach(rank => {
+          [1, 0, 2].forEach((rank) => {
             const p = sorted[rank];
             if (!p) return;
             document.getElementById('pod' + (rank + 1) + 'Name').textContent = p.name;
-            document.getElementById('pod' + (rank + 1) + 'Time').textContent = p.time + 'ms';
+            document.getElementById('pod' + (rank + 1) + 'Time').textContent =
+              p.time + (leaderboardMode === 'average' ? 'ms avg' : 'ms');
             document.getElementById('pod' + (rank + 1) + 'Country').textContent = p.country;
           });
         } else {
@@ -538,8 +692,15 @@
         }
 
         const list = document.getElementById('lbList');
+        const emptyMsg =
+          leaderboardMode === 'today'
+            ? 'No valid times today yet. Be the first!'
+            : leaderboardMode === 'average'
+              ? 'No averages yet. Complete valid runs to appear here.'
+              : 'No valid times recorded yet. Be the first!';
+
         if (sorted.length === 0) {
-          list.innerHTML = '<div class="text-gray-600 text-sm text-center py-8">No valid times recorded yet. Be the first!</div>';
+          list.innerHTML = `<div class="text-gray-600 text-sm text-center py-8">${emptyMsg}</div>`;
           return;
         }
 
@@ -553,7 +714,7 @@
               <div class="col-span-1 ${rankClass} font-bold" style="font-family:'Orbitron',monospace;">${i + 1}</div>
               <div class="col-span-5 text-white font-medium truncate ${isMe ? 'text-red-400' : ''}">${p.name}${isMe ? ' (you)' : ''}</div>
               <div class="col-span-3 text-gray-500 text-xs">${p.country}</div>
-              <div class="col-span-3 text-right font-bold" style="font-family:'Orbitron',monospace; color:${timeColor};">${p.time}ms</div>
+              <div class="col-span-3 text-right font-bold" style="font-family:'Orbitron',monospace; color:${timeColor};">${p.time}${leaderboardMode === 'average' ? 'ms avg' : 'ms'}</div>
             </div>`;
           })
           .join('');
@@ -603,6 +764,11 @@
         document.getElementById('gameTime').classList.add('hidden');
         document.getElementById('gameTimeLabel').classList.add('hidden');
         document.getElementById('resultCard').classList.add('hidden');
+        const pctReset = document.getElementById('resultPercentile');
+        if (pctReset) {
+          pctReset.classList.add('hidden');
+          pctReset.textContent = '';
+        }
 
         document.getElementById('gameMsgText').textContent = 'Press START when ready';
         document.getElementById('gameMsgText').style.color = '#9ca3af';
@@ -750,6 +916,11 @@
         const label = document.getElementById('resultLabel');
         const timeEl = document.getElementById('resultTime');
         const badge = document.getElementById('resultBadge');
+        const pctEl = document.getElementById('resultPercentile');
+        if (pctEl) {
+          pctEl.classList.add('hidden');
+          pctEl.textContent = '';
+        }
 
         if (isFalseStart) {
           label.textContent = 'Result';
@@ -798,6 +969,7 @@
           user_id: currentUser.id,
           email: currentUser.email,
           country: currentUser.country || 'Other',
+          display_name: currentUser.name || currentUser.email,
           reaction_time_ms: time,
           is_valid: isValid,
           is_false_start: isFalseStart,
@@ -812,6 +984,10 @@
           // Refresh UI based on authoritative DB state.
           await Promise.all([refreshDashboard(), refreshLeaderboard()]);
           updateGameAttemptsUI();
+
+          if (isValid && !isFalseStart && time >= MIN_VALID_MS) {
+            await showFasterThanPercentile(time);
+          }
         } catch (err) {
           console.error(err);
           showToast('Could not save attempt', 'error');
@@ -1015,6 +1191,7 @@
       window.handleLogin = handleLogin;
       window.handleSignup = handleSignup;
       window.handleGameClick = handleGameClick;
+      window.setLeaderboardMode = setLeaderboardMode;
 
       // ===== BOOTSTRAP =====
       async function bootstrap() {
