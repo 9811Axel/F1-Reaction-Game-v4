@@ -15,10 +15,11 @@ This project is a static frontend you can host on **GitHub Pages**, backed by **
 
 This creates:
 - `public.profiles` (stores `country`)
-- `public.attempts` (stores reaction attempts)
-- `public.leaderboard_best_times` (SQL view used by the frontend)
+- `public.attempts` (stores reaction attempts, optional `display_name` per row for “Today” leaderboard)
+- `public.leaderboard_best_times` (SQL view used for all-time best)
+- `public.leaderboard_avg_times` (SQL view used for “Best average” leaderboard)
 
-If you already ran an older version of `supabase_setup.sql`, re-run it (or at least apply the schema update) so `public.profiles.display_name` exists and `leaderboard_best_times` returns `display_name`.
+If you already ran an older version of `supabase_setup.sql`, re-run it (or at least apply the schema update) so `public.profiles.display_name` exists, `attempts.display_name` exists, `leaderboard_best_times` returns `display_name`, and `leaderboard_avg_times` exists.
 
 ## 3) Configure the frontend with your Supabase keys
 1. Open `index.html`.
