@@ -382,7 +382,10 @@
       let leaderboardMode = 'alltime'; // 'today' | 'alltime' | 'average'
 
       const MAX_DAILY = 7;
-      const MIN_VALID_MS = 100;
+      /** Minimum reaction time to count as valid (saved + leaderboards). */
+      const MIN_VALID_MS = 1;
+      /** Below this we still count the run as valid but show a softer warning in UI. */
+      const SUSPICIOUS_FAST_MS = 100;
 
       // ===== GAME STATE =====
       let gameState = 'idle'; // idle, countdown, waiting, go, done, falseStart
@@ -892,8 +895,16 @@
         document.getElementById('gameTime').classList.add('anim-pop');
         document.getElementById('gameTimeLabel').classList.remove('hidden');
 
-        document.getElementById('gameMsgText').textContent = isValid ? 'Reaction Time' : 'Suspiciously fast...';
-        document.getElementById('gameMsgText').style.color = isValid ? '#a0a0b0' : '#d97706';
+        if (!isValid) {
+          document.getElementById('gameMsgText').textContent = 'Too fast to count';
+          document.getElementById('gameMsgText').style.color = '#d97706';
+        } else if (elapsed < SUSPICIOUS_FAST_MS) {
+          document.getElementById('gameMsgText').textContent = 'Reaction time (very fast)';
+          document.getElementById('gameMsgText').style.color = '#a0a0b0';
+        } else {
+          document.getElementById('gameMsgText').textContent = 'Reaction Time';
+          document.getElementById('gameMsgText').style.color = '#a0a0b0';
+        }
 
         const btn = document.getElementById('gameBtn');
         btn.textContent = 'RACE AGAIN';
