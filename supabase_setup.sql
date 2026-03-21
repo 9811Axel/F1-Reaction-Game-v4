@@ -23,6 +23,7 @@ create table if not exists public.attempts (
   user_id uuid not null references public.profiles(user_id) on delete cascade,
   email text not null,
   country text not null,
+  display_name text,
   reaction_time_ms integer not null,
   is_valid boolean not null default false,
   is_false_start boolean not null default false,
@@ -30,26 +31,53 @@ create table if not exists public.attempts (
   date_key text not null
 );
 
+alter table public.attempts
+add column if not exists display_name text;
+
 -- View for leaderboard: best valid time per user.
+-- Uses only public.attempts so RLS on profiles does not hide other racers.
 create or replace view public.leaderboard_best_times as
 select
   a.user_id,
-  coalesce(nullif(p.display_name, 'Racer'), a.email) as display_name,
-  p.country as country,
+  coalesce(nullif(nullif(trim(a.display_name), ''), 'Racer'), a.email) as display_name,
+  a.country as country,
   min(a.reaction_time_ms) as best_time_ms
 from public.attempts a
-join public.profiles p on p.user_id = a.user_id
 where
   a.is_valid = true
   and a.is_false_start = false
   and a.reaction_time_ms >= 100
-group by a.user_id, coalesce(nullif(p.display_name, 'Racer'), a.email), p.country;
+group by
+  a.user_id,
+  coalesce(nullif(nullif(trim(a.display_name), ''), 'Racer'), a.email),
+  a.country;
+
+-- Leaderboard by average valid reaction time (lower is better).
+create or replace view public.leaderboard_avg_times as
+select
+  a.user_id,
+  coalesce(nullif(nullif(trim(a.display_name), ''), 'Racer'), a.email) as display_name,
+  a.country as country,
+  round(avg(a.reaction_time_ms))::bigint as avg_time_ms
+from public.attempts a
+where
+  a.is_valid = true
+  and a.is_false_start = false
+  and a.reaction_time_ms >= 100
+group by
+  a.user_id,
+  coalesce(nullif(nullif(trim(a.display_name), ''), 'Racer'), a.email),
+  a.country;
 
 -- Enable Row Level Security
 alter table public.profiles enable row level security;
 alter table public.attempts enable row level security;
 
--- PROFILES RLS
+-- PROFILES RLS (drop first so you can re-run this whole file safely)
+drop policy if exists "profiles_select_own" on public.profiles;
+drop policy if exists "profiles_insert_own" on public.profiles;
+drop policy if exists "profiles_update_own" on public.profiles;
+
 create policy "profiles_select_own" on public.profiles
 for select
 to authenticated
@@ -67,6 +95,9 @@ using (auth.uid() = user_id)
 with check (auth.uid() = user_id);
 
 -- ATTEMPTS RLS
+drop policy if exists "attempts_insert_own" on public.attempts;
+drop policy if exists "attempts_select_authenticated_all" on public.attempts;
+
 -- Users can insert attempts only for themselves.
 create policy "attempts_insert_own" on public.attempts
 for insert
