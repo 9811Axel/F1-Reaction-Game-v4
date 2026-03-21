@@ -969,7 +969,7 @@
           user_id: currentUser.id,
           email: currentUser.email,
           country: currentUser.country || 'Other',
-          display_name: currentUser.name || currentUser.email,
+          display_name: displayNameForAttempt(),
           reaction_time_ms: time,
           is_valid: isValid,
           is_false_start: isFalseStart,
@@ -1034,15 +1034,37 @@
             .from('profiles')
             .insert({ user_id: user.id, email, display_name: email, country: 'Other' });
           if (insertErr) throw insertErr;
-          return { id: user.id, email, name: email, country: 'Other' };
+          return {
+            id: user.id,
+            email,
+            name: email,
+            profileDisplayName: email,
+            country: 'Other'
+          };
         }
 
+        const rawDn = profile.display_name != null ? String(profile.display_name).trim() : '';
+        const hasRacingName = rawDn && rawDn !== 'Racer';
         return {
           id: profile.user_id,
           email: profile.email,
-          name: profile.display_name && profile.display_name !== 'Racer' ? profile.display_name : profile.email,
+          name: hasRacingName ? rawDn : profile.email,
+          // Exact DB value (may be 'Racer'); saving attempts uses displayNameForAttempt()
+          profileDisplayName: rawDn,
           country: profile.country || 'Other'
         };
+      }
+
+      /** Name stored on each attempt row for leaderboards — prefers profile racing name, not email. */
+      function displayNameForAttempt() {
+        if (!currentUser) return '';
+        const raw = String(currentUser.profileDisplayName || '').trim();
+        if (raw && raw !== 'Racer') return raw;
+        const nm = String(currentUser.name || '').trim();
+        if (nm && nm !== currentUser.email) return nm;
+        const em = currentUser.email || '';
+        const at = em.indexOf('@');
+        return at > 0 ? em.slice(0, at) : em || 'Racer';
       }
 
       async function handleLogin(e) {
@@ -1122,6 +1144,7 @@
 
           currentUser.country = country || 'Other';
           currentUser.name = displayName;
+          currentUser.profileDisplayName = displayName;
           setNavUser();
           await Promise.all([refreshDashboard(), refreshLeaderboard()]);
           showPage('dashboard');
